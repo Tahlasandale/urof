@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
 
 class TmdbService {
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 5),
+    receiveTimeout: const Duration(seconds: 5),
+    sendTimeout: const Duration(seconds: 5),
+  ));
   
   // The API key can be supplied via compiler flag --dart-define=TMDB_API_KEY=your_key
   static const String _envApiKey = String.fromEnvironment('TMDB_API_KEY');
@@ -36,10 +40,6 @@ class TmdbService {
           'api_key': key,
           'language': 'fr-FR',
         },
-        options: Options(
-          receiveTimeout: const Duration(seconds: 5),
-          sendTimeout: const Duration(seconds: 5),
-        ),
       );
 
       if (response.data is Map<String, dynamic>) {
@@ -49,5 +49,60 @@ class TmdbService {
       print('TmdbService error: $e');
     }
     return null;
+  }
+
+  /// Search movies by title.
+  Future<Map<String, dynamic>?> searchMovie(String query) async {
+    final key = _apiKey;
+    if (key == null) return null;
+
+    try {
+      final response = await _dio.get(
+        'https://api.themoviedb.org/3/search/movie',
+        queryParameters: {
+          'api_key': key,
+          'query': query,
+          'language': 'fr-FR',
+        },
+      );
+
+      if (response.data is Map<String, dynamic>) {
+        return response.data;
+      }
+    } catch (e) {
+      print('TmdbService error: $e');
+    }
+    return null;
+  }
+
+  /// Search TV shows by title.
+  Future<Map<String, dynamic>?> searchTv(String query) async {
+    final key = _apiKey;
+    if (key == null) return null;
+
+    try {
+      final response = await _dio.get(
+        'https://api.themoviedb.org/3/search/tv',
+        queryParameters: {
+          'api_key': key,
+          'query': query,
+          'language': 'fr-FR',
+        },
+      );
+
+      if (response.data is Map<String, dynamic>) {
+        return response.data;
+      }
+    } catch (e) {
+      print('TmdbService error: $e');
+    }
+    return null;
+  }
+
+  /// Build full poster URL from relative path.
+  String? getPosterUrl(String? path, {int width = 500}) {
+    if (path == null || path.isEmpty) return null;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return 'https://image.tmdb.org/t/p/w$width$cleanPath';
   }
 }

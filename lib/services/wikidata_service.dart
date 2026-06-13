@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../models/urof_object.dart';
+import 'cache_service.dart';
 import 'openlibrary_service.dart';
 import 'tmdb_service.dart';
 
@@ -7,11 +8,22 @@ class WikidataService {
   final Dio _dio = Dio();
   final _openLibraryService = OpenLibraryService();
   final _tmdbService = TmdbService();
+  final CacheService _cacheService;
+
+  WikidataService({CacheService? cacheService})
+      : _cacheService = cacheService ?? CacheService();
 
   Future<UrofObject?> resolveText(String text) async {
     try {
       final String trimmedText = text.trim();
       if (trimmedText.isEmpty) return null;
+
+      // Check cache first
+      final cached = _cacheService.get(trimmedText);
+      if (cached != null) {
+        print('WikidataService: cache hit for "$trimmedText"');
+        return cached;
+      }
 
       // 1. Search for entity
       final searchResponse = await _dio.get(
@@ -367,7 +379,7 @@ class WikidataService {
         }
       }
 
-      return UrofObject(
+      final result = UrofObject(
         id: id,
         title: label,
         type: type,
@@ -376,6 +388,11 @@ class WikidataService {
         attributes: attributes,
         sourceUrl: 'https://www.wikidata.org/wiki/$id',
       );
+
+      // Store in cache
+      _cacheService.put(trimmedText, result);
+
+      return result;
     } catch (e) {
       print('Wikidata resolution error: $e');
       return null;

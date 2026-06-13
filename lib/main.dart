@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'models/urof_object.dart';
+import 'services/cache_service.dart';
 import 'services/wikidata_service.dart';
 import 'ui/object_sheet.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive for caching
+  await Hive.initFlutter();
+
   runApp(const MyApp());
 }
 
@@ -40,7 +46,8 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   static const _channel = MethodChannel('com.urof.urof/process_text');
-  final _wikidataService = WikidataService();
+  final _cacheService = CacheService();
+  late final WikidataService _wikidataService;
   final _textController = TextEditingController();
 
   bool _isLoading = false;
@@ -50,7 +57,14 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _initServices();
+  }
+
+  Future<void> _initServices() async {
+    await _cacheService.init();
+    _wikidataService = WikidataService(cacheService: _cacheService);
     _setupPlatformChannel();
+    _checkInitialText();
   }
 
   void _setupPlatformChannel() {
@@ -62,9 +76,6 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
     });
-
-    // Check for initial text sent during app startup
-    _checkInitialText();
   }
 
   Future<void> _checkInitialText() async {
