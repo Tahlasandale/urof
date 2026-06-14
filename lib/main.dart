@@ -61,6 +61,8 @@ class _MainScreenState extends State<MainScreen> {
   bool _isLoading = false;
   UrofObject? _resolvedObject;
   String? _errorMessage;
+  bool _isProcessTextLaunch = false;
+  bool? _overlayPermissionGranted;
 
   @override
   void initState() {
@@ -73,6 +75,18 @@ class _MainScreenState extends State<MainScreen> {
     _wikidataService = WikidataService(cacheService: _cacheService);
     _setupPlatformChannel();
     _checkInitialText();
+    _checkOverlayPermission();
+  }
+
+  Future<void> _checkOverlayPermission() async {
+    try {
+      final granted = await FlutterOverlayWindow.isPermissionGranted();
+      if (mounted) {
+        setState(() => _overlayPermissionGranted = granted);
+      }
+    } catch (_) {
+      // Silently fail — permission check is non-critical at startup
+    }
   }
 
   void _setupPlatformChannel() {
@@ -97,22 +111,35 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  Future<void> _requestOverlayPermission() async {
+    try {
+      final status = await FlutterOverlayWindow.requestPermission() ?? false;
+      if (mounted) {
+        setState(() => _overlayPermissionGranted = status);
+      }
+    } catch (e) {
+      print("Overlay permission request failed: $e");
+      if (mounted) {
+        setState(() => _overlayPermissionGranted = false);
+      }
+    }
+  }
+
   Future<void> _resolveText(String text, {bool isProcessText = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
       _resolvedObject = null;
+      if (isProcessText) _isProcessTextLaunch = true;
     });
 
     final obj = await _wikidataService.resolveText(text);
 
     if (isProcessText && obj != null) {
-      try {
-        bool status = await FlutterOverlayWindow.isPermissionGranted();
-        if (!status) {
-          status = await FlutterOverlayWindow.requestPermission() ?? false;
-        }
-        if (status) {
+      // Try overlay only if we already checked permission is granted
+      final overlayOk = _overlayPermissionGranted == true;
+      if (overlayOk) {
+        try {
           await FlutterOverlayWindow.showOverlay(
             height: 400,
             width: 350,
@@ -123,26 +150,35 @@ class _MainScreenState extends State<MainScreen> {
           await FlutterOverlayWindow.shareData(obj.toJson());
           _closeApp();
           return;
+        } catch (e) {
+          print("Failed to show overlay: $e");
         }
-      } catch (e) {
-        print("Failed to show overlay: $e");
       }
-    }
 
-    setState(() {
-      _isLoading = false;
-      if (obj != null) {
-        _resolvedObject = obj;
-      } else {
-        _errorMessage = 'Aucune information trouvée pour "$text"';
-        // Auto-close app after showing error briefly if launched from selection
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted && _resolvedObject == null && _errorMessage != null) {
-            _closeApp();
-          }
+      // Overlay not available — show result in-app with a hint
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _resolvedObject = obj;
+          _errorMessage = _overlayPermissionGranted == false
+              ? "💡 Active l'overlay flottant depuis l'accueil pour un affichage sans quitter l'app"
+              : null;
         });
       }
-    });
+      return;
+    }
+
+    // Fallback: show result or error in-app
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        if (obj != null) {
+          _resolvedObject = obj;
+        } else {
+          _errorMessage = 'Aucune information trouvée pour "$text"';
+        }
+      });
+    }
   }
 
   void _closeApp() {
@@ -157,11 +193,10 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // If we are showing the bottom sheet, dim the background
     final hasActiveSheet = _isLoading || _resolvedObject != null || _errorMessage != null;
 
     return Scaffold(
-      backgroundColor: hasActiveSheet ? Colors.black.withOpacity(0.4) : const Color(0xFF09090B),
+      backgroundColor: hasActiveSheet ? Colors.black.withValues(alpha: 0.4) : const Color(0xFF09090B),
       body: SafeArea(
         child: Stack(
           children: [
@@ -215,10 +250,10 @@ class _MainScreenState extends State<MainScreen> {
                   // Manual search box
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.04),
+                      color: Colors.white.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
+                        color: Colors.white.withValues(alpha: 0.08),
                         width: 1.5,
                       ),
                     ),
@@ -253,22 +288,76 @@ class _MainScreenState extends State<MainScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
+                  // Overlay permission card
+                  if (_overlayPermissionGranted == false)
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.tips_and_updates_rounded, color: Colors.amberAccent, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Overlay flottant désactivé',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Permet d\'afficher les résultats sans quitter l\'app en cours',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            onPressed: _requestOverlayPermission,
+                            style: TextButton.styleFrom(
+                              backgroundColor: Colors.deepPurpleAccent.withValues(alpha: 0.3),
+                              foregroundColor: Colors.deepPurpleAccent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Activer'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 20),
                   // Instructions card
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.deepPurpleAccent.withOpacity(0.1),
-                          Colors.purpleAccent.withOpacity(0.05),
+                          Colors.deepPurpleAccent.withValues(alpha: 0.1),
+                          Colors.purpleAccent.withValues(alpha: 0.05),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Colors.deepPurpleAccent.withOpacity(0.2),
+                        color: Colors.deepPurpleAccent.withValues(alpha: 0.2),
                       ),
                     ),
                     child: const Column(
@@ -344,11 +433,15 @@ class _MainScreenState extends State<MainScreen> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF2D161B),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                    border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
                   ),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.error_outline_rounded, color: Colors.redAccent),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 20),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -356,11 +449,16 @@ class _MainScreenState extends State<MainScreen> {
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 18),
                         onPressed: () {
                           setState(() {
                             _errorMessage = null;
+                            // If came from PROCESS_TEXT and there's no result, close app
+                            if (_isProcessTextLaunch && _resolvedObject == null) {
+                              _closeApp();
+                            }
                           });
                         },
                       ),
@@ -381,7 +479,9 @@ class _MainScreenState extends State<MainScreen> {
                     setState(() {
                       _resolvedObject = null;
                     });
-                    _closeApp();
+                    if (_isProcessTextLaunch) {
+                      _closeApp();
+                    }
                   },
                 ),
               ),
