@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Autoriser api.geonames.org en HTTP (cleartext) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">api.geonames.org</domain>
+    </domain-config>
+    <!-- Tout le reste en HTTPS uniquement -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

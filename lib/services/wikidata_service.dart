@@ -5,7 +5,10 @@ import 'openlibrary_service.dart';
 import 'tmdb_service.dart';
 
 class WikidataService {
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+  ));
   final _openLibraryService = OpenLibraryService();
   final _tmdbService = TmdbService();
   final CacheService _cacheService;
@@ -14,9 +17,9 @@ class WikidataService {
       : _cacheService = cacheService ?? CacheService();
 
   Future<UrofObject?> resolveText(String text) async {
+    final String trimmedText = text.trim();
+    if (trimmedText.isEmpty) return null;
     try {
-      final String trimmedText = text.trim();
-      if (trimmedText.isEmpty) return null;
 
       // Check cache first
       final cached = _cacheService.get(trimmedText);
@@ -39,6 +42,7 @@ class WikidataService {
 
       final searchResults = searchResponse.data['search'];
       if (searchResults == null || searchResults.isEmpty) {
+        print('WikidataService: no search results for "$trimmedText"');
         return null;
       }
 
@@ -393,8 +397,11 @@ class WikidataService {
       _cacheService.put(trimmedText, result);
 
       return result;
+    } on DioException catch (e) {
+      print('WikidataService: Dio error for "$trimmedText": ${e.type} — ${e.message}');
+      return null;
     } catch (e) {
-      print('Wikidata resolution error: $e');
+      print('WikidataService: unexpected error for "$trimmedText": $e');
       return null;
     }
   }
