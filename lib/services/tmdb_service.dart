@@ -7,8 +7,12 @@ class TmdbService {
     sendTimeout: const Duration(seconds: 5),
   ));
   
-  // The API key can be supplied via compiler flag --dart-define=TMDB_API_KEY=your_key
-  static const String _envApiKey = String.fromEnvironment('TMDB_API_KEY');
+  /// Clé API TMDB.
+  /// Priorité : --dart-define=TMDB_API_KEY=xxx > fallback intégré.
+  static const String _envApiKey = String.fromEnvironment(
+    'TMDB_API_KEY',
+    defaultValue: '4d84a0553d5aa1420e3fc54ad30aafb3',
+  );
   
   final String? _customApiKey;
 

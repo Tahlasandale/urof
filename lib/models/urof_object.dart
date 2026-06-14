@@ -26,4 +26,28 @@ class UrofObject {
       attributes: {},
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'type': type,
+      'description': description,
+      'imageUrl': imageUrl,
+      'attributes': attributes,
+      'sourceUrl': sourceUrl,
+    };
+  }
+
+  factory UrofObject.fromJson(Map<String, dynamic> json) {
+    return UrofObject(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      type: json['type'] as String? ?? 'unknown',
+      description: json['description'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String?,
+      attributes: Map<String, String>.from(json['attributes'] ?? {}),
+      sourceUrl: json['sourceUrl'] as String?,
+    );
+  }
 }

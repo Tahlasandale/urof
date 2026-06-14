@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'models/urof_object.dart';
 import 'services/cache_service.dart';
 import 'services/wikidata_service.dart';
 import 'ui/object_sheet.dart';
+import 'ui/overlay_app.dart';
+
+@pragma('vm:entry-point')
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const OverlayApp());
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,7 +80,7 @@ class _MainScreenState extends State<MainScreen> {
       if (call.method == 'onTextReceived') {
         final text = call.arguments as String?;
         if (text != null && text.isNotEmpty) {
-          _resolveText(text);
+          _resolveText(text, isProcessText: true);
         }
       }
     });
@@ -82,14 +90,14 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final initialText = await _channel.invokeMethod<String>('getSharedText');
       if (initialText != null && initialText.isNotEmpty) {
-        _resolveText(initialText);
+        _resolveText(initialText, isProcessText: true);
       }
     } on PlatformException catch (e) {
       print("Failed to get initial shared text: ${e.message}");
     }
   }
 
-  Future<void> _resolveText(String text) async {
+  Future<void> _resolveText(String text, {bool isProcessText = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -98,13 +106,36 @@ class _MainScreenState extends State<MainScreen> {
 
     final obj = await _wikidataService.resolveText(text);
 
+    if (isProcessText && obj != null) {
+      try {
+        bool status = await FlutterOverlayWindow.isPermissionGranted();
+        if (!status) {
+          status = await FlutterOverlayWindow.requestPermission() ?? false;
+        }
+        if (status) {
+          await FlutterOverlayWindow.showOverlay(
+            height: 400,
+            width: 350,
+            alignment: OverlayAlignment.center,
+            enableDrag: true,
+            positionGravity: PositionGravity.none,
+          );
+          await FlutterOverlayWindow.shareData(obj.toJson());
+          _closeApp();
+          return;
+        }
+      } catch (e) {
+        print("Failed to show overlay: $e");
+      }
+    }
+
     setState(() {
       _isLoading = false;
       if (obj != null) {
         _resolvedObject = obj;
       } else {
         _errorMessage = 'Aucune information trouvée pour "$text"';
-        // Auto-close overlay after showing error briefly if launched from selection
+        // Auto-close app after showing error briefly if launched from selection
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted && _resolvedObject == null && _errorMessage != null) {
             _closeApp();

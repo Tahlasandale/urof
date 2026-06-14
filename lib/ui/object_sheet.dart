@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/urof_object.dart';
 
 class ObjectSheet extends StatelessWidget {
@@ -257,16 +258,20 @@ class ObjectSheet extends StatelessWidget {
                     children: [
                       if (object.sourceUrl != null)
                         TextButton.icon(
-                          onPressed: () {
-                            // Copy link or launch in browser if url launcher is installed,
-                            // or copy to clipboard for now
-                            Clipboard.setData(ClipboardData(text: object.sourceUrl!));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("Lien copié dans le presse-papiers"),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
+                          onPressed: () async {
+                            final url = Uri.parse(object.sourceUrl!);
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(url);
+                            } else {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text("Impossible d'ouvrir le lien"),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            }
                           },
                           icon: const Icon(Icons.link_rounded, size: 16),
                           label: const Text(
@@ -280,18 +285,11 @@ class ObjectSheet extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.share_rounded, size: 18),
                         onPressed: () {
-                          // Quick share copy
                           final infoText = "${object.title}\n${object.description}\n\n${object.attributes.entries.map((e) => "${e.key}: ${e.value}").join('\n')}";
-                          Clipboard.setData(ClipboardData(text: infoText));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Fiche copiée dans le presse-papiers"),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          Share.share(infoText);
                         },
                         color: Colors.white60,
-                        tooltip: "Copier la fiche",
+                        tooltip: "Partager la fiche",
                       ),
                     ],
                   ),
