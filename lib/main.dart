@@ -1,18 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'models/urof_object.dart';
 import 'services/cache_service.dart';
 import 'services/wikidata_service.dart';
 import 'ui/object_sheet.dart';
-import 'ui/overlay_app.dart';
-
-@pragma('vm:entry-point')
-void overlayMain() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const OverlayApp());
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,7 +54,6 @@ class _MainScreenState extends State<MainScreen> {
   UrofObject? _resolvedObject;
   String? _errorMessage;
   bool _isProcessTextLaunch = false;
-  bool? _overlayPermissionGranted;
 
   @override
   void initState() {
@@ -75,18 +66,6 @@ class _MainScreenState extends State<MainScreen> {
     _wikidataService = WikidataService(cacheService: _cacheService);
     _setupPlatformChannel();
     _checkInitialText();
-    _checkOverlayPermission();
-  }
-
-  Future<void> _checkOverlayPermission() async {
-    try {
-      final granted = await FlutterOverlayWindow.isPermissionGranted();
-      if (mounted) {
-        setState(() => _overlayPermissionGranted = granted);
-      }
-    } catch (_) {
-      // Silently fail — permission check is non-critical at startup
-    }
   }
 
   void _setupPlatformChannel() {
@@ -111,20 +90,6 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _requestOverlayPermission() async {
-    try {
-      final status = await FlutterOverlayWindow.requestPermission() ?? false;
-      if (mounted) {
-        setState(() => _overlayPermissionGranted = status);
-      }
-    } catch (e) {
-      print("Overlay permission request failed: $e");
-      if (mounted) {
-        setState(() => _overlayPermissionGranted = false);
-      }
-    }
-  }
-
   Future<void> _resolveText(String text, {bool isProcessText = false}) async {
     setState(() {
       _isLoading = true;
@@ -135,40 +100,6 @@ class _MainScreenState extends State<MainScreen> {
 
     final obj = await _wikidataService.resolveText(text);
 
-    if (isProcessText && obj != null) {
-      // Try overlay only if we already checked permission is granted
-      final overlayOk = _overlayPermissionGranted == true;
-      if (overlayOk) {
-        try {
-          await FlutterOverlayWindow.showOverlay(
-            height: 200,
-            width: 300,
-            alignment: OverlayAlignment.center,
-            enableDrag: true,
-            positionGravity: PositionGravity.none,
-          );
-          await FlutterOverlayWindow.shareData(obj.toJson());
-          _closeApp();
-          return;
-        } catch (e) {
-          print("Failed to show overlay: $e");
-        }
-      }
-
-      // Overlay not available — show result in-app with a hint
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _resolvedObject = obj;
-          _errorMessage = _overlayPermissionGranted == false
-              ? "💡 Active l'overlay flottant depuis l'accueil pour un affichage sans quitter l'app"
-              : null;
-        });
-      }
-      return;
-    }
-
-    // Fallback: show result or error in-app
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -288,60 +219,6 @@ class _MainScreenState extends State<MainScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  // Overlay permission card
-                  if (_overlayPermissionGranted == false)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.amber.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.tips_and_updates_rounded, color: Colors.amberAccent, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Overlay flottant désactivé',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Permet d\'afficher les résultats sans quitter l\'app en cours',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          TextButton(
-                            onPressed: _requestOverlayPermission,
-                            style: TextButton.styleFrom(
-                              backgroundColor: Colors.deepPurpleAccent.withValues(alpha: 0.3),
-                              foregroundColor: Colors.deepPurpleAccent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: const Text('Activer'),
-                          ),
-                        ],
-                      ),
-                    ),
                   const SizedBox(height: 20),
                   // Instructions card
                   Container(
