@@ -78,9 +78,17 @@ class _OverlayScreenState extends State<OverlayScreen> {
         _contentKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null && renderBox.hasSize) {
       final size = renderBox.size;
-      // Add padding (24px on each side = 48 total) and clamp to reasonable bounds
-      final w = (size.width + 48).clamp(200.0, 400.0).ceil();
-      final h = (size.height + 48).clamp(80.0, 500.0).ceil();
+
+      // Use screen dimensions for min/max bounds
+      final screenSize = MediaQuery.of(context).size;
+      final minW = screenSize.width / 4;
+      final minH = screenSize.height / 4;
+      final maxW = screenSize.width * 0.9;
+      final maxH = screenSize.height * 0.85;
+
+      // Add padding (24px on each side = 48 total) and clamp to screen-based bounds
+      final w = (size.width + 48).clamp(minW, maxW).ceil();
+      final h = (size.height + 48).clamp(minH, maxH).ceil();
       FlutterOverlayWindow.resizeOverlay(w, h, true);
     }
   }
@@ -149,170 +157,60 @@ class _OverlayScreenState extends State<OverlayScreen> {
     }
 
     return Center(
-      child: Container(
-        key: _contentKey,
-        padding: const EdgeInsets.all(16),
-        decoration: _glassDecoration(),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Close button row — toujours visible
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                _buildCloseButton(),
-              ],
-            ),
-
-            // Title
-            Text(
-              object.title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.4,
-              ),
-            ),
-            const SizedBox(height: 6),
-
-            // Type badge
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: primaryColor.withOpacity(0.3),
-                      width: 1.0,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(typeIcon, size: 11, color: primaryColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        object.type.toUpperCase(),
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Description
-            if (object.description.isNotEmpty) ...[
-              Text(
-                object.description,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.75),
-                  fontSize: 13,
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // Attributes
-            if (object.attributes.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.03),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.04),
-                    width: 1.0,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "INFORMATIONS",
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    ...object.attributes.entries.map(
-                      (entry) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: 90,
-                              child: Text(
-                                entry.key,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.45),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                entry.value,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            // Footer link
-            if (object.sourceUrl != null)
+      child: SingleChildScrollView(
+        child: Container(
+          key: _contentKey,
+          padding: const EdgeInsets.all(16),
+          decoration: _glassDecoration(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Close button row — toujours visible
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  InkWell(
-                    onTap: () async {
-                      final url = Uri.parse(object.sourceUrl!);
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url);
-                      }
-                    },
+                  _buildCloseButton(),
+                ],
+              ),
+
+              // Title
+              Text(
+                object.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 6),
+
+              // Type badge
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: primaryColor.withOpacity(0.3),
+                        width: 1.0,
+                      ),
+                    ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          Icons.open_in_new_rounded,
-                          size: 12,
-                          color: primaryColor,
-                        ),
+                        Icon(typeIcon, size: 11, color: primaryColor),
                         const SizedBox(width: 4),
                         Text(
-                          "Wikidata",
+                          object.type.toUpperCase(),
                           style: TextStyle(
                             color: primaryColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ],
@@ -320,7 +218,119 @@ class _OverlayScreenState extends State<OverlayScreen> {
                   ),
                 ],
               ),
-          ],
+              const SizedBox(height: 10),
+
+              // Description
+              if (object.description.isNotEmpty) ...[
+                Text(
+                  object.description,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.75),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Attributes
+              if (object.attributes.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.03),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.04),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "INFORMATIONS",
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ...object.attributes.entries.map(
+                        (entry) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                width: 90,
+                                child: Text(
+                                  entry.key,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.45),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  entry.value,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              // Footer link
+              if (object.sourceUrl != null)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    InkWell(
+                      onTap: () async {
+                        final url = Uri.parse(object.sourceUrl!);
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
+                        }
+                      },
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.open_in_new_rounded,
+                            size: 12,
+                            color: primaryColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            "Wikidata",
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );

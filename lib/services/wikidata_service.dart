@@ -19,10 +19,11 @@ class WikidataService {
   Future<UrofObject?> resolveText(String text) async {
     final String trimmedText = text.trim();
     if (trimmedText.isEmpty) return null;
+    final String normalizedText = _normalizeSearchText(trimmedText);
     try {
 
-      // Check cache first
-      final cached = _cacheService.get(trimmedText);
+      // Check cache first (using normalized text as key)
+      final cached = _cacheService.get(normalizedText);
       if (cached != null) {
         print('WikidataService: cache hit for "$trimmedText"');
         return cached;
@@ -33,7 +34,7 @@ class WikidataService {
         'https://www.wikidata.org/w/api.php',
         queryParameters: {
           'action': 'wbsearchentities',
-          'search': trimmedText,
+          'search': normalizedText,
           'language': 'fr',
           'format': 'json',
           'uselang': 'fr',
@@ -393,8 +394,8 @@ class WikidataService {
         sourceUrl: 'https://www.wikidata.org/wiki/$id',
       );
 
-      // Store in cache
-      _cacheService.put(trimmedText, result);
+      // Store in cache (using normalized text as key)
+      _cacheService.put(normalizedText, result);
 
       return result;
     } on DioException catch (e) {
@@ -438,6 +439,49 @@ class WikidataService {
       }
     }
     return result;
+  }
+
+  String _normalizeSearchText(String text) {
+    String normalized = text.toLowerCase();
+
+    // Remove common French leading articles
+    final articles = ['le ', 'la ', 'les ', 'un ', 'une ', 'des ', "l' "];
+    for (final article in articles) {
+      if (normalized.startsWith(article)) {
+        normalized = normalized.substring(article.length);
+        break; // only remove one article
+      }
+    }
+    // Also handle "l'" without trailing space: "l'homme" -> "homme"
+    if (normalized.startsWith("l'")) {
+      normalized = normalized.substring(2);
+    }
+
+    // Normalize accents and diacritics
+    normalized = normalized
+        .replaceAll('é', 'e')
+        .replaceAll('è', 'e')
+        .replaceAll('ê', 'e')
+        .replaceAll('ë', 'e')
+        .replaceAll('à', 'a')
+        .replaceAll('â', 'a')
+        .replaceAll('ù', 'u')
+        .replaceAll('û', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ô', 'o')
+        .replaceAll('ö', 'o')
+        .replaceAll('î', 'i')
+        .replaceAll('ï', 'i')
+        .replaceAll('ç', 'c')
+        .replaceAll('ÿ', 'y');
+
+    // Replace apostrophes and hyphens with spaces (splits compound words)
+    normalized = normalized.replaceAll("'", ' ').replaceAll('-', ' ');
+
+    // Strip extra whitespace
+    normalized = normalized.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+    return normalized;
   }
 
   String _cleanWikidataDate(String dateStr) {

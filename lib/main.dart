@@ -141,8 +141,8 @@ class _MainScreenState extends State<MainScreen> {
       if (overlayOk) {
         try {
           await FlutterOverlayWindow.showOverlay(
-            height: 120,
-            width: 260,
+            height: 200,
+            width: 300,
             alignment: OverlayAlignment.center,
             enableDrag: true,
             positionGravity: PositionGravity.none,
